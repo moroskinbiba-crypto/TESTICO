@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tico Retro Collector</title>
+  <link rel="stylesheet" href="popup.css">
+  <script src="popup.js" defer></script>
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <div class="logo">T</div>
+      <div>
+        <h1>Tico Retro Collector</h1>
+        <p>Сборщик раздач RuTracker</p>
+      </div>
+    </header>
+
+    <section class="intro">
+      <strong>Работает в твоём обычном Chrome</strong>
+      <span>Войди на RuTracker как обычно. Расширение читает только открытую страницу категории — cookies и пароль оно не получает.</span>
+    </section>
+
+    <section class="section">
+      <div class="section-title">1. Открой категорию</div>
+      <div class="category-list">
+        <button class="category-button" data-category="2424">
+          <span><b>NES / Dendy</b><small>Категория RuTracker 2424</small></span>
+          <span class="arrow">Открыть ↗</span>
+        </button>
+        <button class="category-button" data-category="2425">
+          <span><b>SEGA Mega Drive</b><small>Категория RuTracker 2425</small></span>
+          <span class="arrow">Открыть ↗</span>
+        </button>
+        <button class="category-button" data-category="2394">
+          <span><b>Sony PlayStation 1</b><small>Категория RuTracker 2394</small></span>
+          <span class="arrow">Открыть ↗</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">2. Добавь открытую категорию</div>
+      <button id="collect" class="primary">Добавить текущую страницу</button>
+      <p id="status" class="status" role="status">Открой одну из категорий выше, дождись загрузки раздач и нажми кнопку.</p>
+    </section>
+
+    <section class="section collected">
+      <div class="section-title">Собрано</div>
+      <div id="summary" class="summary">Пока ничего не собрано</div>
+      <div class="actions">
+        <button id="export" class="download" disabled>Скачать JSON</button>
+        <button id="clear" class="secondary" disabled>Очистить</button>
+      </div>
+    </section>
+
+    <footer>JSON: rutracker_retro_games_raw.json</footer>
+  </main>
+</body>
+</html>
