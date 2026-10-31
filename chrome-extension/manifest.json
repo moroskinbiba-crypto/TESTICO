@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Tico — RuTracker Retro Collector",
-  "version": "1.0.0",
-  "description": "Собирает список ретро-раздач RuTracker из открытой страницы и сохраняет JSON.",
+  "version": "1.1.0",
+  "description": "Собирает раздачи консольных игр RuTracker из открытых страниц категорий и сохраняет JSON.",
   "minimum_chrome_version": "116",
   "permissions": [
     "activeTab",
