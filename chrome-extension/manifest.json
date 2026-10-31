@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Tico — RuTracker Retro Collector",
+  "version": "1.0.0",
+  "description": "Собирает список ретро-раздач RuTracker из открытой страницы и сохраняет JSON.",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "action": {
+    "default_title": "Tico — сборщик RuTracker",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://rutracker.org/forum/*",
+        "https://www.rutracker.org/forum/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
