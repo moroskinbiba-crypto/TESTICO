@@ -36,23 +36,21 @@
 
 Cookie `cf_clearance` может быть привязана к IP-адресу и параметрам браузера, а среда GitHub Actions запускается с другого IP. Поэтому даже с корректными секретами RuTracker может вернуть проверку Cloudflare (HTTP 403). В таком случае скрипт завершится с явной ошибкой, а не создаст пустую базу как будто парсинг прошёл успешно.
 
-## Запуск на Windows (рекомендуется при HTTP 403 в GitHub Actions)
+## Portable EXE для Windows (без установки Python)
 
-Для локального запуска используется отдельный Chromium через Playwright. Cookie вручную копировать не нужно: войди в RuTracker в открывшемся окне, а браузерный профиль сохранится в папке `.rutracker-profile`.
+Готовая Windows x64-сборка публикуется на странице [Releases](https://github.com/moroskinbiba-crypto/TESTICO/releases/tag/windows-latest).
 
-1. Установи Python 3.10 или новее с сайта https://www.python.org/downloads/windows/. Во время установки включи **Add Python to PATH**.
-2. Скачай ZIP репозитория через **Code → Download ZIP** и распакуй его, например, в `C:\TicoScraper`.
-3. Запусти файл `run_local.bat` двойным щелчком. Он создаст виртуальное окружение, установит библиотеки и Chromium, а затем запустит парсер. При первом запуске установка браузера займёт немного времени.
-4. Откроется окно Chromium. Войди в свой аккаунт RuTracker и, если сайт попросит, пройди проверку Cloudflare обычным способом.
-5. Вернись в окно консоли и нажми Enter. Скрипт соберёт три категории и сохранит `rutracker_retro_games_raw.json` в папке проекта.
+1. Скачай `TicoRuTrackerScraper-Windows-x64.zip`.
+2. Распакуй архив целиком в обычную папку, например `C:\TicoScraper`. Не запускай EXE прямо из ZIP.
+3. Убедись, что установлен Google Chrome.
+4. Запусти `TicoRuTrackerScraper.exe`.
+5. В открывшемся окне Chrome авторизуйся на RuTracker и пройди проверку, если она появится.
+6. Вернись в консоль программы и нажми Enter.
+7. JSON появится рядом с EXE: `rutracker_retro_games_raw.json`.
 
-При следующих запусках используй ту же папку проекта: сессия хранится в `.rutracker-profile`. Не удаляй эту папку, пока хочешь сохранять вход. Не отправляй её другим людям и не загружай в GitHub.
+Python, pip, виртуальное окружение и отдельная установка Playwright не нужны. Google Chrome должен быть установлен на компьютере.
 
-Для ручного запуска из PowerShell:
+Сессия хранится в папке `.rutracker-profile` рядом с EXE. Не удаляй её, если хочешь сохранять вход. Не передавай эту папку другим людям и не загружай её в GitHub. Не запускай одновременно две копии программы с одним профилем.
 
-```powershell
-py -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-local.txt
-.\.venv\Scripts\python.exe -m playwright install chromium
-.\.venv\Scripts\python.exe parser_local.py
-```
+Если Windows SmartScreen покажет предупреждение о неизвестном издателе, это связано с тем, что сборка не подписана сертификатом издателя. Запускай файл только если скачал его из официального Releases этого репозитория.
+
