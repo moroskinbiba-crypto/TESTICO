@@ -2,17 +2,36 @@
 
 Автоматический сборщик раздач ретро-игр с RuTracker для эмулятор-фронтенда Tico.
 
-## Настройка для работы
+## Настройка авторизации RuTracker
 
-Для того чтобы скрипт мог обходить авторизацию RuTracker, требуется указать ваш cookie `bb_data`:
+В актуальной схеме RuTracker используется cookie `bb_session`, а не старый `bb_data`. Скрипт принимает cookie отдельно через GitHub Actions Secrets.
 
 1. Авторизуйтесь на [RuTracker.org](https://rutracker.org) в браузере.
-2. Откройте инструменты разработчика (F12) -> вкладка **Application** (Приложение) -> **Cookies**.
-3. Скопируйте значение cookie с именем **`bb_data`**.
-4. В вашем репозитории на GitHub перейдите в **Settings** -> **Secrets and variables** -> **Actions**.
-5. Нажмите **New repository secret**:
-   - **Name:** `BB_DATA`
-   - **Secret:** *вставьте скопированное значение cookie*
-6. Перейдите во вкладку **Actions**, выберите воркфлоу **Run RuTracker Scraper** и нажмите **Run workflow**.
+2. Нажмите F12 и откройте **Application → Storage → Cookies → https://rutracker.org**.
+3. Добавьте в GitHub Secrets значения cookie из столбца **Value**. Не копируйте сами названия cookie.
 
-Результат сохранится в файле `rutracker_retro_games_raw.json`.
+Откройте [Settings → Secrets and variables → Actions](https://github.com/moroskinbiba-crypto/TESTICO/settings/secrets/actions) и создайте следующие Repository secrets:
+
+| Secret name | Cookie name |
+|---|---|
+| `BB_SESSION` | `bb_session` |
+| `BB_GUID` | `bb_guid` |
+| `BB_SSL` | `bb_ssl` |
+| `BB_T` | `bb_t` |
+| `CF_CLEARANCE` | `cf_clearance` |
+
+`BB_SESSION` обязателен. Рекомендуется добавить все пять cookie. Не публикуйте их в Issues, коммитах или чатах: они позволяют использовать вашу браузерную сессию.
+
+## Запуск
+
+1. Откройте вкладку **Actions**.
+2. Выберите **Run RuTracker Scraper**.
+3. Нажмите **Run workflow**.
+
+Скрипт также настроен на еженедельный запуск по воскресеньям в 00:00 UTC.
+
+Результат сохраняется в `rutracker_retro_games_raw.json`.
+
+## Важное замечание о Cloudflare
+
+Cookie `cf_clearance` может быть привязана к IP-адресу и параметрам браузера, а среда GitHub Actions запускается с другого IP. Поэтому даже с корректными секретами RuTracker может вернуть проверку Cloudflare (HTTP 403). В таком случае скрипт завершится с явной ошибкой, а не создаст пустую базу как будто парсинг прошёл успешно.
