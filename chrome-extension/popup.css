@@ -1,0 +1,62 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+  color: #17202b;
+  background: #f5f7fa;
+}
+* { box-sizing: border-box; }
+body { width: 380px; margin: 0; background: #f5f7fa; }
+.app { padding: 18px; }
+.header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.logo {
+  width: 42px; height: 42px; border-radius: 13px;
+  display: grid; place-items: center; color: white;
+  background: #202d43; font-size: 23px; font-weight: 800;
+}
+h1 { margin: 0; font-size: 16px; letter-spacing: -0.3px; }
+.header p { margin: 3px 0 0; color: #697586; font-size: 12px; }
+.intro {
+  display: grid; gap: 6px; padding: 12px 13px; border-radius: 12px;
+  background: #eaf0f8; color: #334155; font-size: 12px; line-height: 1.45;
+}
+.intro strong { color: #17202b; font-size: 12px; }
+.section { margin-top: 17px; }
+.section-title {
+  margin-bottom: 9px; color: #536174; font-size: 11px;
+  font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
+}
+.category-list { display: grid; gap: 7px; }
+.category-button {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 10px 11px; text-align: left; border: 1px solid #dfe5ec;
+  border-radius: 10px; background: white; cursor: pointer; color: inherit;
+}
+.category-button:hover { border-color: #8da6c5; background: #fbfdff; }
+.category-button span:first-child { display: grid; gap: 3px; }
+.category-button b { font-size: 12px; }
+.category-button small { color: #7b8796; font-size: 10px; }
+.arrow { color: #456b9e; font-size: 11px; font-weight: 700; white-space: nowrap; }
+button { font: inherit; }
+.primary, .download, .secondary {
+  width: 100%; min-height: 38px; border: 0; border-radius: 9px;
+  font-size: 12px; font-weight: 750; cursor: pointer;
+}
+.primary { color: white; background: #233a5b; }
+.primary:hover { background: #2f4c75; }
+.download { color: white; background: #287a58; }
+.download:hover:not(:disabled) { background: #21694b; }
+.secondary { color: #566273; background: #e9edf2; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.status {
+  min-height: 30px; margin: 8px 1px 0; color: #697586;
+  font-size: 11px; line-height: 1.45;
+}
+.status.error { color: #b42318; }
+.status.success { color: #187249; }
+.summary {
+  padding: 10px 11px; border: 1px solid #e0e6ed; border-radius: 9px;
+  background: white; color: #536174; font-size: 11px; line-height: 1.6;
+  white-space: pre-line;
+}
+.actions { display: grid; grid-template-columns: 1fr 92px; gap: 8px; margin-top: 9px; }
+footer { margin-top: 15px; color: #8a95a3; font-size: 10px; text-align: center; }
