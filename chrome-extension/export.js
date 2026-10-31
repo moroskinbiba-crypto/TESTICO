@@ -26,7 +26,7 @@ async function prepareExport() {
         title: item.title || null,
         topic_url: item.topic_url || null,
         categories: [],
-        size_bytes: item.size_bytes ?? null,
+        size_bytes: item.size_bytes === undefined ? null : item.size_bytes,
         size_text: item.size_text || null,
         seed_text: item.seed_text || null,
         leech_text: item.leech_text || null,
@@ -90,7 +90,7 @@ async function prepareExport() {
   const links = Array.from(linkMap.values());
   const result = {
     schema: "tico-rutracker-catalog-capture/1",
-    collector_version: "1.2.0",
+    collector_version: "1.2.1",
     exported_at: new Date().toISOString(),
     summary: {
       fingerprint_pages: pages.length,
@@ -102,14 +102,14 @@ async function prepareExport() {
       magnet_links: links.filter(link => link.type === "magnet").length,
       torrent_links: links.filter(link => link.type !== "magnet").length
     },
-    topics,
+    topics: topics,
     download_links: links,
     page_fingerprints: pages
   };
 
   exportJson = JSON.stringify(result, null, 2);
   countEl.textContent =
-    "Готово: " + topics.length + " тем, " + links.length + " ссылок скачивания, " + pages.length + " отпечатков.";
+    "Готово: " + topics.length + " тем, " + links.length + " ссылок, " + pages.length + " отпечатков.";
   downloadButton.disabled = pages.length === 0;
   if (!pages.length) statusEl.textContent = "Сначала открой страницы RuTracker с включённым автосбором.";
 }
@@ -125,7 +125,7 @@ downloadButton.addEventListener("click", () => {
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 30000);
-    statusEl.textContent = "JSON сохранён в папку загрузок Chrome.";
+    statusEl.textContent = "JSON отправлен в папку загрузок Chrome.";
     statusEl.className = "status success";
   } catch (error) {
     statusEl.textContent = error.message || String(error);

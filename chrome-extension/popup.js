@@ -15,7 +15,7 @@ const exportButton = document.getElementById("export");
 const clearButton = document.getElementById("clear");
 const toggleButton = document.getElementById("toggleAuto");
 
-function status(message, type = "") {
+function status(message, type) {
   statusEl.textContent = message;
   statusEl.className = "status" + (type ? " " + type : "");
 }
@@ -38,35 +38,36 @@ function countLinks(pages) {
 }
 
 async function refresh() {
-  const [pages, settings, lastData] = await Promise.all([
+  const [pages, settings, last, lastError] = await Promise.all([
     getPages(),
     chrome.storage.local.get({ tico_auto_capture: true }),
-    chrome.storage.local.get({ tico_last_capture: null })
+    chrome.storage.local.get({ tico_last_capture: null }),
+    chrome.storage.local.get({ tico_last_capture_error: null })
   ]);
+
   const topics = new Set(pages.filter(page => page.kind === "topic").map(page => String(page.topic_id)));
-  const listingPages = pages.filter(page => page.kind === "listing");
+  const listings = pages.filter(page => page.kind === "listing");
   const listedTopics = new Set();
-  for (const page of listingPages) {
+  for (const page of listings) {
     for (const item of page.listing_topics || []) listedTopics.add(String(item.topic_id));
   }
   const links = countLinks(pages);
 
   const lines = [
     "Всего отпечатков: " + pages.length,
-    "Страниц категорий: " + listingPages.length,
+    "Страниц категорий: " + listings.length,
     "Уникальных тем в списках: " + listedTopics.size,
     "Открытых страниц раздач: " + topics.size,
-    "Уникальных ссылок скачивания: " + links.length,
+    "Ссылок скачивания: " + links.length,
     "Magnet: " + links.filter(link => link.type === "magnet").length,
     "Torrent / dl.php: " + links.filter(link => link.type !== "magnet").length
   ];
 
-  const last = lastData.tico_last_capture;
-  if (last?.ok) {
-    lines.push("Последняя: " + (last.title || last.key));
-    if (last.kind === "topic") lines.push("Ссылок на ней: " + (last.download_link_count || 0));
-  } else if (last?.error) {
-    lines.push("Последняя ошибка: " + last.error);
+  if (last.tico_last_capture && last.tico_last_capture.ok) {
+    lines.push("Последняя: " + (last.tico_last_capture.title || last.tico_last_capture.key));
+  }
+  if (lastError.tico_last_capture_error && lastError.tico_last_capture_error.error) {
+    lines.push("Ошибка последней попытки: " + lastError.tico_last_capture_error.error);
   }
 
   summaryEl.textContent = pages.length ? lines.join("\n") : "Пока отпечатков нет.";
@@ -83,7 +84,7 @@ document.querySelectorAll("[data-category]").forEach(button => {
   button.addEventListener("click", async () => {
     try {
       const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-      if (!tabs[0]?.id) throw new Error("Не удалось определить активную вкладку.");
+      if (!tabs[0] || !tabs[0].id) throw new Error("Не удалось определить активную вкладку.");
       await chrome.tabs.update(tabs[0].id, { url: CATEGORY_URLS[button.dataset.category] });
       window.close();
     } catch (error) {
@@ -104,16 +105,17 @@ captureButton.addEventListener("click", async () => {
   try {
     const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     const tab = tabs[0];
-    if (!tab?.id || !tab.url?.startsWith("https://rutracker.org/forum/")) {
+    if (!tab || !tab.id || !tab.url || tab.url.indexOf("rutracker.org/forum/") === -1) {
       throw new Error("Открой страницу RuTracker в этой вкладке.");
     }
+
     let response;
     try {
       response = await chrome.tabs.sendMessage(tab.id, { type: "TICO_CAPTURE_CURRENT_PAGE" });
     } catch (_) {
-      throw new Error("Расширение ещё не подключено к вкладке. Обнови страницу RuTracker клавишей F5.");
+      throw new Error("Скрипт ещё не подключён к этой вкладке. Нажми F5 и повтори.");
     }
-    if (!response?.ok) throw new Error(response?.error || "Не удалось снять отпечаток.");
+    if (!response || !response.ok) throw new Error(response && response.error ? response.error : "Не удалось снять отпечаток.");
     status(
       "Сохранено: " + (response.result.title || response.result.key) +
       ". Ссылок скачивания: " + response.result.download_link_count + ".",
@@ -136,7 +138,7 @@ clearButton.addEventListener("click", async () => {
   const all = await chrome.storage.local.get(null);
   const keys = Object.keys(all).filter(key => key.startsWith("fp:"));
   if (keys.length) await chrome.storage.local.remove(keys);
-  await chrome.storage.local.remove("tico_last_capture");
+  await chrome.storage.local.remove(["tico_last_capture", "tico_last_capture_error"]);
   status("Локальная база очищена.", "success");
   await refresh();
 });

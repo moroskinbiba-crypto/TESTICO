@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Tico — RuTracker Page Fingerprinter",
-  "version": "1.2.0",
-  "description": "Собирает отпечатки страниц RuTracker, названия тем, magnet и торрент-ссылки.",
+  "version": "1.2.1",
+  "description": "Автоматически собирает отпечатки страниц RuTracker, названия тем, magnet и торрент-ссылки.",
   "minimum_chrome_version": "116",
   "permissions": ["activeTab", "tabs", "storage", "unlimitedStorage"],
   "action": {
@@ -11,8 +11,8 @@
   },
   "content_scripts": [{
     "matches": [
-      "https://rutracker.org/forum/*",
-      "https://www.rutracker.org/forum/*"
+      "*://rutracker.org/forum/*",
+      "*://*.rutracker.org/forum/*"
     ],
     "js": ["content.js"],
     "run_at": "document_idle"

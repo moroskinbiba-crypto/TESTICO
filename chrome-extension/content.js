@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.2.0";
+  const VERSION = "1.2.1";
   const SCHEMA = "tico-rutracker-page-fingerprint/1";
   const CATEGORIES = {
     "908": "Игры для PS",
@@ -12,7 +12,7 @@
     "968": "Dreamcast",
     "129": "Остальные консоли"
   };
-  const PRIVATE_QUERY = /^(sid|session|sessionid|auth|authkey|passkey|token|csrf|securitytoken|key)$/i;
+  const PRIVATE_QUERY = /^(sid|session|sessionid|auth|authkey|passkey|token|csrf|securitytoken)$/i;
   const SELECTORS = [
     "a.topictitle", "a.maintitle", "h1", "#topic_title", ".topic-title",
     "tr.t-row", "td.tor-size", ".seed", ".leech", ".post_body",
@@ -20,14 +20,14 @@
     "a[href*='dl.php']", "a[href^='magnet:']"
   ];
 
-  const text = (node, limit = 500) => {
+  const text = (node, limit) => {
     if (!node) return "";
     const value = (node.innerText || node.textContent || "")
       .replace(/\u00a0/g, " ").replace(/[ \t\r\n]+/g, " ").trim();
-    return value.slice(0, limit);
+    return Number.isFinite(limit) ? value.slice(0, limit) : value;
   };
 
-  const classes = node => node?.classList ? Array.from(node.classList).slice(0, 12) : [];
+  const classes = node => node && node.classList ? Array.from(node.classList).slice(0, 12) : [];
 
   function cleanHttpUrl(value) {
     try {
@@ -57,7 +57,9 @@
 
   function topicIdFromAnchor(anchor) {
     if (!anchor) return null;
-    const dataId = anchor.getAttribute("data-topic_id") || anchor.getAttribute("data-topic-id");
+    const dataId = anchor.getAttribute("data-topic_id") ||
+      anchor.getAttribute("data-topic-id") ||
+      (anchor.closest("tr") && anchor.closest("tr").getAttribute("data-topic_id"));
     if (dataId && /^\d+$/.test(dataId)) return dataId;
     try {
       const id = new URL(anchor.getAttribute("href") || "", location.href).searchParams.get("t");
@@ -71,7 +73,7 @@
     const path = location.pathname.toLowerCase();
     if (path.endsWith("/tracker.php")) {
       const id = new URL(location.href).searchParams.get("f");
-      if (CATEGORIES[id]) return "listing";
+      if (id && /^\d+$/.test(id)) return "listing";
     }
     if (path.endsWith("/viewtopic.php")) {
       const id = new URL(location.href).searchParams.get("t");
@@ -81,22 +83,51 @@
   }
 
   function categoryFromTopic() {
-    for (const anchor of document.querySelectorAll('a[href*="tracker.php?f="]')) {
+    for (const anchor of document.querySelectorAll('a[href*="tracker.php"]')) {
       try {
         const id = new URL(anchor.href, location.href).searchParams.get("f");
-        if (CATEGORIES[id]) return id;
+        if (id && /^\d+$/.test(id)) return id;
       } catch (_) {}
     }
     return null;
   }
 
+  function categoryName(id) {
+    return CATEGORIES[String(id)] || (id ? "Категория " + id : null);
+  }
+
   function isChallenge() {
-    const body = (document.title + " " + (document.body?.innerText || "")).toLowerCase();
+    const body = (document.title + " " + (document.body ? document.body.innerText : "")).toLowerCase();
     return body.includes("just a moment") ||
       body.includes("checking your browser") ||
       body.includes("verify you are human") ||
       body.includes("проверка безопасности") ||
       location.pathname.includes("/cdn-cgi/challenge-platform/");
+  }
+
+  function showBadge(message, isError) {
+    if (!document.body) return;
+    let badge = document.getElementById("tico-fingerprint-status");
+    if (!badge) {
+      badge = document.createElement("div");
+      badge.id = "tico-fingerprint-status";
+      badge.setAttribute("role", "status");
+      badge.style.cssText = [
+        "position:fixed", "right:16px", "bottom:16px", "z-index:2147483647",
+        "max-width:360px", "padding:10px 14px", "border-radius:10px",
+        "font:12px/1.45 Arial,sans-serif", "color:#fff",
+        "box-shadow:0 4px 20px rgba(0,0,0,.25)", "pointer-events:none",
+        "opacity:0", "transition:opacity .15s ease"
+      ].join(";");
+      document.body.appendChild(badge);
+    }
+    badge.style.background = isError ? "#a93226" : "#176b45";
+    badge.textContent = "Tico: " + message;
+    requestAnimationFrame(() => { badge.style.opacity = "1"; });
+    clearTimeout(badge._ticoTimer);
+    badge._ticoTimer = setTimeout(() => {
+      badge.style.opacity = "0";
+    }, 6500);
   }
 
   function parseMagnet(value) {
@@ -113,77 +144,101 @@
         trackers = params.getAll("tr").length;
       } catch (_) {}
     }
-    return { url: uri || value, info_hash: infoHash, display_name: displayName, trackers_count: trackers };
+    return {
+      url: uri || value,
+      info_hash: infoHash,
+      display_name: displayName,
+      trackers_count: trackers
+    };
   }
 
   function getDownloadLinks() {
     const result = [];
     const seen = new Set();
-    for (const anchor of document.querySelectorAll("a[href]")) {
-      const href = (anchor.getAttribute("href") || "").trim();
-      if (!href) continue;
+    const nodes = Array.from(document.querySelectorAll("a[href], [data-href], [data-url]"));
 
-      let item = null;
-      if (/^magnet:/i.test(href)) {
-        const parsed = parseMagnet(href);
-        item = {
-          type: "magnet",
-          url: parsed.url,
-          label: text(anchor, 160) || anchor.getAttribute("title") || "Magnet",
-          info_hash: parsed.info_hash,
-          display_name: parsed.display_name,
-          trackers_count: parsed.trackers_count
-        };
-      } else {
-        let url;
-        try { url = new URL(href, location.href); } catch (_) { continue; }
-        const path = url.pathname.toLowerCase();
-        const label = text(anchor, 160) || anchor.getAttribute("title") || "";
-        const className = String(anchor.className || "").toLowerCase();
-        const torrentFile = /\.torrent$/i.test(path);
-        const downloadEndpoint = /(?:^|\/)(?:dl|download)\.php$/i.test(path);
-        const downloadLabel = /скачать.{0,30}(торрент|torrent)|download.{0,30}torrent/i.test(label);
-        const downloadClass = /(dl-link|download|torrent-link)/i.test(className);
-        if (!torrentFile && !downloadEndpoint && !downloadLabel && !downloadClass) continue;
-        item = {
-          type: torrentFile ? "torrent_file" : "torrent_download",
-          url: cleanHttpUrl(url.toString()),
-          label: label || "Скачать торрент",
-          info_hash: null,
-          display_name: null,
-          trackers_count: 0
-        };
+    for (const node of nodes) {
+      const candidates = [
+        node.getAttribute("href"),
+        node.getAttribute("data-href"),
+        node.getAttribute("data-url")
+      ].filter(Boolean);
+
+      for (const raw of candidates) {
+        const href = raw.trim();
+        if (!href) continue;
+        let item = null;
+
+        if (/^magnet:/i.test(href)) {
+          const parsed = parseMagnet(href);
+          item = {
+            type: "magnet",
+            url: parsed.url,
+            label: text(node, 160) || node.getAttribute("title") || "Magnet",
+            info_hash: parsed.info_hash,
+            display_name: parsed.display_name,
+            trackers_count: parsed.trackers_count
+          };
+        } else {
+          let url;
+          try { url = new URL(href, location.href); } catch (_) { continue; }
+          const path = url.pathname.toLowerCase();
+          const label = text(node, 160) || node.getAttribute("title") || "";
+          const className = String(node.className || "").toLowerCase();
+          const isTorrentFile = /\.torrent$/i.test(path);
+          const isDownloadEndpoint = /(?:^|\/)(?:dl|download)\.php$/i.test(path);
+          const hasDownloadLabel = /скачать.{0,40}(торрент|torrent)|download.{0,40}torrent/i.test(label);
+          const hasDownloadClass = /(dl-link|download|torrent-link)/i.test(className);
+          if (!isTorrentFile && !isDownloadEndpoint && !hasDownloadLabel && !hasDownloadClass) continue;
+
+          item = {
+            type: isTorrentFile ? "torrent_file" : "torrent_download",
+            url: cleanHttpUrl(url.toString()),
+            label: label || "Скачать торрент",
+            info_hash: null,
+            display_name: null,
+            trackers_count: 0
+          };
+        }
+
+        if (!item || !item.url) continue;
+        const key = item.type + "|" + item.url;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        result.push(item);
       }
-
-      if (!item?.url) continue;
-      const key = item.type + "|" + item.url;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      result.push(item);
     }
-    return result.slice(0, 120);
+    return result.slice(0, 150);
   }
 
   function getTopicsFromListing() {
-    const result = [];
-    for (const row of document.querySelectorAll("tr.t-row")) {
-      const anchor = row.querySelector("a.topictitle");
+    const output = [];
+    const seen = new Set();
+    const anchors = Array.from(document.querySelectorAll(
+      "a.topictitle, a[href*='viewtopic.php'][href*='t=']"
+    ));
+
+    for (const anchor of anchors) {
       const id = topicIdFromAnchor(anchor);
-      if (!anchor || !id) continue;
-      const sizeCell = row.querySelector("td.tor-size");
-      const rawSize = sizeCell?.getAttribute("data-ts_size") || "";
-      result.push({
+      const title = text(anchor, 500);
+      if (!id || !title || seen.has(id)) continue;
+      seen.add(id);
+
+      const row = anchor.closest("tr");
+      const sizeCell = row ? row.querySelector("td.tor-size") : null;
+      const sizeRaw = sizeCell ? (sizeCell.getAttribute("data-ts_size") || "") : "";
+      output.push({
         topic_id: id,
-        title: text(anchor),
+        title: title,
         topic_url: "https://rutracker.org/forum/viewtopic.php?t=" + id,
-        size_bytes: /^\d+$/.test(rawSize) ? Number(rawSize) : null,
+        size_bytes: /^\d+$/.test(sizeRaw) ? Number(sizeRaw) : null,
         size_text: text(sizeCell, 80) || null,
-        seed_text: text(row.querySelector(".seed, .seedmed, .seedlow, [class*='seed']"), 40) || null,
-        leech_text: text(row.querySelector(".leech, .leechmed, .leechlow, [class*='leech']"), 40) || null,
+        seed_text: text(row ? row.querySelector(".seed, .seedmed, .seedlow, [class*='seed']") : null, 40) || null,
+        leech_text: text(row ? row.querySelector(".leech, .leechmed, .leechlow, [class*='leech']") : null, 40) || null,
         row_classes: classes(row)
       });
     }
-    return result;
+    return output;
   }
 
   function getPagination(categoryId) {
@@ -211,20 +266,24 @@
     const output = [];
     const seen = new Set();
     const excluded = /(автор|пользоват|разместил|загрузил|никнейм|username|uploader|profile|профиль)/i;
-    const add = (label, value, source) => {
+
+    function add(label, value, source) {
       if (!label || !value || excluded.test(label)) return;
       const key = label + "|" + value;
       if (seen.has(key)) return;
       seen.add(key);
-      output.push({ label, value, source });
-    };
+      output.push({ label: label, value: value, source: source });
+    }
 
     for (const dl of Array.from(document.querySelectorAll("dl"))) {
       for (const dt of dl.querySelectorAll("dt")) {
         const dd = dt.nextElementSibling;
-        if (dd?.tagName.toLowerCase() === "dd") add(text(dt, 80), text(dd, 220), "dl");
+        if (dd && dd.tagName.toLowerCase() === "dd") {
+          add(text(dt, 80), text(dd, 220), "dl");
+        }
       }
     }
+
     for (const table of Array.from(document.querySelectorAll("table")).slice(0, 16)) {
       for (const row of Array.from(table.querySelectorAll("tr")).slice(0, 30)) {
         const cells = Array.from(row.querySelectorAll(":scope > th, :scope > td"));
@@ -238,13 +297,16 @@
     return Array.from(document.querySelectorAll("table")).slice(0, 16).map((table, index) => {
       const rows = Array.from(table.querySelectorAll("tr"));
       return {
-        index,
+        index: index,
         id: table.id || null,
         classes: classes(table),
         row_count: rows.length,
-        column_counts: rows.slice(0, 12).map(row => row.querySelectorAll(":scope > th, :scope > td").length),
+        column_counts: rows.slice(0, 12).map(row =>
+          row.querySelectorAll(":scope > th, :scope > td").length
+        ),
         first_row_labels: rows[0]
-          ? Array.from(rows[0].querySelectorAll(":scope > th, :scope > td")).slice(0, 10).map(cell => text(cell, 80))
+          ? Array.from(rows[0].querySelectorAll(":scope > th, :scope > td"))
+              .slice(0, 10).map(cell => text(cell, 80))
           : []
       };
     });
@@ -254,18 +316,26 @@
     const tags = {};
     const classCounts = {};
     const ids = [];
-    const nodes = document.body ? Array.from(document.body.querySelectorAll("*")).slice(0, 3200) : [];
+    const nodes = document.body
+      ? Array.from(document.body.querySelectorAll("*")).slice(0, 3200)
+      : [];
+
     for (const node of nodes) {
       const tag = node.tagName.toLowerCase();
       tags[tag] = (tags[tag] || 0) + 1;
-      for (const name of Array.from(node.classList || [])) classCounts[name] = (classCounts[name] || 0) + 1;
+      for (const name of Array.from(node.classList || [])) {
+        classCounts[name] = (classCounts[name] || 0) + 1;
+      }
       if (node.id && ids.length < 80) ids.push(node.id);
     }
+
     return {
-      body_child_count: document.body?.children.length || 0,
+      body_child_count: document.body ? document.body.children.length : 0,
       scanned_nodes: nodes.length,
       tag_counts: tags,
-      common_classes: Object.entries(classCounts).sort((a, b) => b[1] - a[1]).slice(0, 50).map(([name, count]) => ({ name, count })),
+      common_classes: Object.entries(classCounts)
+        .sort((a, b) => b[1] - a[1]).slice(0, 50)
+        .map(([name, count]) => ({ name: name, count: count })),
       ids: Array.from(new Set(ids)),
       selector_counts: Object.fromEntries(SELECTORS.map(selector => {
         try { return [selector, document.querySelectorAll(selector).length]; }
@@ -276,13 +346,16 @@
 
   function makeHash(kind, structure, tables) {
     const stable = JSON.stringify({
-      kind,
+      kind: kind,
       selector_counts: structure.selector_counts,
       tag_counts: structure.tag_counts,
       common_classes: structure.common_classes,
       tables: tables.map(table => ({
-        id: table.id, classes: table.classes, row_count: table.row_count,
-        column_counts: table.column_counts, first_row_labels: table.first_row_labels
+        id: table.id,
+        classes: table.classes,
+        row_count: table.row_count,
+        column_counts: table.column_counts,
+        first_row_labels: table.first_row_labels
       }))
     });
     let hash = 2166136261;
@@ -312,14 +385,14 @@
     return {
       schema: SCHEMA,
       collector_version: VERSION,
-      key,
-      kind,
+      key: key,
+      kind: kind,
       page_url: cleanHttpUrl(location.href),
       page_title: heading,
       heading_classes: classes(headingNode),
       topic_id: topicId,
       category_id: categoryId,
-      category_name: categoryId ? (CATEGORIES[categoryId] || null) : null,
+      category_name: categoryName(categoryId),
       page_start: /^\d+$/.test(start) ? Number(start) : start,
       captured_at: new Date().toISOString(),
       capture_source: source,
@@ -329,10 +402,10 @@
         language: document.documentElement.lang || null,
         charset: document.characterSet || null,
         body_text_length: text(document.body, 1000000).length,
-        body_element_count: document.body?.querySelectorAll("*").length || 0
+        body_element_count: document.body ? document.body.querySelectorAll("*").length : 0
       },
-      structure,
-      tables,
+      structure: structure,
+      tables: tables,
       metadata_pairs: metadata,
       listing_topics: topics,
       download_links: downloads,
@@ -343,12 +416,19 @@
 
   async function saveRecord(record) {
     const key = "fp:" + encodeURIComponent(record.key);
-    const previousData = await chrome.storage.local.get(key);
-    const previous = previousData[key];
+    const saved = await chrome.storage.local.get(key);
+    const previous = saved[key];
     const now = new Date().toISOString();
-    record.first_seen = previous?.first_seen || now;
+
+    // Keep previously found links if the page has temporarily hidden them on this visit.
+    if (record.kind === "topic" && previous && previous.download_links && !record.download_links.length) {
+      record.download_links = previous.download_links;
+      record.download_link_count = record.download_links.length;
+    }
+
+    record.first_seen = previous && previous.first_seen ? previous.first_seen : now;
     record.last_seen = now;
-    record.visit_count = (Number(previous?.visit_count) || 0) + 1;
+    record.visit_count = (Number(previous && previous.visit_count) || 0) + 1;
 
     await chrome.storage.local.set({
       [key]: record,
@@ -367,42 +447,36 @@
     return record;
   }
 
-  async function settlePage() {
-    if (!document.body || typeof MutationObserver === "undefined") {
-      await new Promise(resolve => setTimeout(resolve, 900));
-      return;
+  async function waitForUsefulContent(kind) {
+    const maxAttempts = kind === "listing" ? 10 : 6;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (isChallenge()) throw new Error("RuTracker показывает проверку безопасности. Сначала заверши её в обычном окне.");
+      const count = kind === "listing" ? getTopicsFromListing().length : getDownloadLinks().length;
+      if (count > 0) return;
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
-    await new Promise(resolve => {
-      let timer;
-      let done = false;
-      const observer = new MutationObserver(() => {
-        clearTimeout(timer);
-        timer = setTimeout(finish, 650);
-      });
-      function finish() {
-        if (done) return;
-        done = true;
-        observer.disconnect();
-        clearTimeout(timer);
-        clearTimeout(hardLimit);
-        resolve();
-      }
-      observer.observe(document.body, { childList: true, subtree: true, attributes: true });
-      timer = setTimeout(finish, 1000);
-      const hardLimit = setTimeout(finish, 4500);
-    });
   }
 
   async function capture(source) {
     if (isChallenge()) throw new Error("RuTracker показывает проверку безопасности. Сначала заверши её в обычном окне.");
     const kind = pageType();
-    if (!kind) throw new Error("Открой страницу категории tracker.php или тему раздачи viewtopic.php.");
+    if (!kind) throw new Error("Это не распознанная страница категории или раздачи RuTracker.");
+
+    await waitForUsefulContent(kind);
     const record = createRecord(kind, source || "manual");
-    if (kind === "listing" && !record.listing_topics.length) {
-      throw new Error("Не найдены строки раздач tr.t-row. Возможно, структура страницы изменилась.");
-    }
-    if (kind === "topic" && !record.topic_id) throw new Error("Не найден ID темы раздачи.");
     const saved = await saveRecord(record);
+
+    if (kind === "listing") {
+      showBadge(
+        "Страница списка сохранена · " + saved.listing_topics.length + " тем · стр. " + saved.page_start,
+        false
+      );
+    } else if (saved.download_links.length) {
+      showBadge("Тема сохранена · найдено ссылок: " + saved.download_links.length, false);
+    } else {
+      showBadge("Тема сохранена, но magnet / torrent-ссылки не обнаружены", true);
+    }
+
     return {
       key: saved.key,
       kind: saved.kind,
@@ -417,31 +491,38 @@
   }
 
   async function autoCapture() {
-    if (!pageType()) return;
-    const config = await chrome.storage.local.get({ tico_auto_capture: true });
-    if (!config.tico_auto_capture) return;
-    await settlePage();
+    const kind = pageType();
+    if (!kind) return;
+    const settings = await chrome.storage.local.get({ tico_auto_capture: true });
+    if (!settings.tico_auto_capture) return;
+
     try {
-      await capture("automatic");
+      const result = await capture("automatic");
+      await chrome.storage.local.set({ tico_last_capture_error: null });
+      return result;
     } catch (error) {
+      const message = error && error.message ? error.message : String(error);
       await chrome.storage.local.set({
-        tico_last_capture: {
-          ok: false,
+        tico_last_capture_error: {
+          error: message,
           page_url: cleanHttpUrl(location.href),
-          captured_at: new Date().toISOString(),
-          error: error?.message || String(error)
+          captured_at: new Date().toISOString()
         }
       });
+      showBadge(message, true);
     }
   }
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type !== "TICO_CAPTURE_CURRENT_PAGE") return false;
+    if (!message || message.type !== "TICO_CAPTURE_CURRENT_PAGE") return false;
     capture("manual")
-      .then(result => sendResponse({ ok: true, result }))
-      .catch(error => sendResponse({ ok: false, error: error?.message || String(error) }));
+      .then(result => sendResponse({ ok: true, result: result }))
+      .catch(error => sendResponse({ ok: false, error: error && error.message ? error.message : String(error) }));
     return true;
   });
 
-  setTimeout(() => autoCapture().catch(() => {}), 250);
+  setTimeout(() => autoCapture().catch(() => {}), 350);
+  window.addEventListener("pageshow", () => {
+    if (pageType()) setTimeout(() => autoCapture().catch(() => {}), 500);
+  });
 })();
