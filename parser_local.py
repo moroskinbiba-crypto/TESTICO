@@ -1,5 +1,6 @@
 import json
 import re
+import sys
 import time
 from pathlib import Path
 from urllib.parse import urlencode
@@ -8,7 +9,12 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
-BASE_DIR = Path(__file__).resolve().parent
+# In Python, keep data beside the script; in a frozen build, keep it beside the EXE.
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(sys.executable).resolve().parent
+else:
+    BASE_DIR = Path(__file__).resolve().parent
+
 PROFILE_DIR = BASE_DIR / ".rutracker-profile"
 OUTPUT_FILE = BASE_DIR / "rutracker_retro_games_raw.json"
 
@@ -118,12 +124,20 @@ def main():
     print("Cookie вручную копировать не нужно — Chromium сохранит сессию локально.")
 
     with sync_playwright() as playwright:
-        context = playwright.chromium.launch_persistent_context(
-            user_data_dir=str(PROFILE_DIR),
-            headless=False,
-            locale="ru-RU",
-            viewport={"width": 1440, "height": 900},
-        )
+        try:
+            context = playwright.chromium.launch_persistent_context(
+                user_data_dir=str(PROFILE_DIR),
+                channel="chrome",
+                headless=False,
+                locale="ru-RU",
+                viewport={"width": 1440, "height": 900},
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                "Не удалось запустить Google Chrome. Установи Google Chrome для Windows "
+                "и попробуй снова. "
+                f"Подробности: {exc}"
+            ) from exc
 
         try:
             page = context.pages[0] if context.pages else context.new_page()
