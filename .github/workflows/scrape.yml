@@ -1,0 +1,39 @@
+name: Run RuTracker Scraper
+
+on:
+  workflow_dispatch: # Позволяет запускать вручную из вкладки Actions
+  schedule:
+    - cron: '0 0 * * 0' # Автозапуск раз в неделю
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run script
+        env:
+          BB_DATA: ${{ secrets.BB_DATA }}
+        run: |
+          python parser.py
+
+      - name: Commit and push changes if JSON updated
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add rutracker_retro_games_raw.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update retro games JSON database" && git push)
