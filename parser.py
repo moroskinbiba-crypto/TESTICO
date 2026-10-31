@@ -6,7 +6,6 @@ from bs4 import BeautifulSoup
 
 SEARCH_URL = "https://rutracker.org/forum/tracker.php"
 
-# ID категорий на рутрекере (при необходимости можно изменить или дополнить)
 CATEGORIES = {
     "NES / Dendy": 2424,
     "SEGA Mega Drive": 2425,
@@ -17,19 +16,50 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
-# Получаем cookie из секретов GitHub Actions или локального окружения
-BB_DATA = os.environ.get("BB_DATA", "")
-
-COOKIES = {
-    "bb_data": BB_DATA
+# RuTracker uses bb_session for account authentication.
+# Other cookies are loaded separately so values containing punctuation
+# (for example bb_t) are not accidentally split as a Cookie header.
+COOKIE_ENV = {
+    "bb_session": ("BB_SESSION", "/forum/"),
+    "bb_guid": ("BB_GUID", "/forum/"),
+    "bb_ssl": ("BB_SSL", "/forum/"),
+    "bb_t": ("BB_T", "/forum/"),
+    "cf_clearance": ("CF_CLEARANCE", "/"),
 }
 
 
-def parse_rutracker_category(category_name, c_id, max_pages=1):
-    games_data = []
+def create_session():
     session = requests.Session()
     session.headers.update(HEADERS)
-    session.cookies.update(COOKIES)
+
+    loaded_cookies = []
+    for cookie_name, (env_name, path) in COOKIE_ENV.items():
+        value = os.environ.get(env_name, "").strip()
+        if value:
+            session.cookies.set(
+                cookie_name,
+                value,
+                domain=".rutracker.org",
+                path=path,
+                secure=True,
+            )
+            loaded_cookies.append(cookie_name)
+
+    if "bb_session" not in loaded_cookies:
+        raise RuntimeError(
+            "Не задан BB_SESSION. Добавьте cookie bb_session в GitHub Secret BB_SESSION."
+        )
+
+    missing = [name for name in COOKIE_ENV if name not in loaded_cookies]
+    if missing:
+        print("Предупреждение: не заданы дополнительные cookie: " + ", ".join(missing))
+
+    print("Загружены cookie: " + ", ".join(loaded_cookies))
+    return session
+
+
+def parse_rutracker_category(session, category_name, c_id, max_pages=1):
+    games_data = []
 
     for page in range(max_pages):
         start = page * 50
@@ -41,11 +71,17 @@ def parse_rutracker_category(category_name, c_id, max_pages=1):
         }
 
         print(f"Парсим категорию '{category_name}', страница {page + 1}...")
-        response = session.get(SEARCH_URL, params=params)
+        response = session.get(SEARCH_URL, params=params, timeout=30)
 
         if response.status_code != 200:
-            print(f"Ошибка доступа к странице: {response.status_code}")
+            print(f"Ошибка доступа к странице: HTTP {response.status_code}")
             break
+
+        if "Just a moment" in response.text or "cf-chl-" in response.text:
+            raise RuntimeError(
+                "RuTracker вернул страницу проверки Cloudflare вместо результатов. "
+                "Cookie cf_clearance могла истечь или не приниматься с IP GitHub Actions."
+            )
 
         soup = BeautifulSoup(response.text, "html.parser")
         topics = soup.find_all("tr", class_="t-row")
@@ -84,20 +120,23 @@ def parse_rutracker_category(category_name, c_id, max_pages=1):
 
 
 def main():
-    if not BB_DATA:
-        print("ВНИМАНИЕ: Переменная окружения BB_DATA не задана!")
-
+    session = create_session()
     all_retro_games = []
 
     for cat_name, cat_id in CATEGORIES.items():
-        category_results = parse_rutracker_category(cat_name, cat_id, max_pages=1)
+        category_results = parse_rutracker_category(
+            session, cat_name, cat_id, max_pages=1
+        )
         all_retro_games.extend(category_results)
 
     output_filename = "rutracker_retro_games_raw.json"
     with open(output_filename, "w", encoding="utf-8") as f:
         json.dump(all_retro_games, f, ensure_ascii=False, indent=4)
 
-    print(f"\nГотово! Собрано раздач: {len(all_retro_games)}. Сохранено в {output_filename}")
+    print(
+        f"\nГотово! Собрано раздач: {len(all_retro_games)}. "
+        f"Сохранено в {output_filename}"
+    )
 
 
 if __name__ == "__main__":
