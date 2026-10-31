@@ -2,6 +2,13 @@ name: Run RuTracker Scraper
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "parser.py"
+      - "requirements.txt"
+      - ".github/workflows/scrape.yml"
   schedule:
     - cron: '0 0 * * 0' # Every Sunday at 00:00 UTC
 
