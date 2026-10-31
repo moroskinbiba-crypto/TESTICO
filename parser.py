@@ -74,8 +74,10 @@ def parse_rutracker_category(session, category_name, c_id, max_pages=1):
         response = session.get(SEARCH_URL, params=params, timeout=30)
 
         if response.status_code != 200:
-            print(f"Ошибка доступа к странице: HTTP {response.status_code}")
-            break
+            raise RuntimeError(
+                f"RuTracker вернул HTTP {response.status_code}. "
+                "Парсинг остановлен; JSON не будет перезаписан пустыми данными."
+            )
 
         if "Just a moment" in response.text or "cf-chl-" in response.text:
             raise RuntimeError(
