@@ -1,7 +1,11 @@
 const CATEGORY_URLS = {
-  "2424": "https://rutracker.org/forum/tracker.php?f=2424&o=1&s=2&start=0",
-  "2425": "https://rutracker.org/forum/tracker.php?f=2425&o=1&s=2&start=0",
-  "2394": "https://rutracker.org/forum/tracker.php?f=2394&o=1&s=2&start=0"
+  "908": "https://rutracker.org/forum/tracker.php?f=908&o=1&s=2&start=0",
+  "357": "https://rutracker.org/forum/tracker.php?f=357&o=1&s=2&start=0",
+  "1116": "https://rutracker.org/forum/tracker.php?f=1116&o=1&s=2&start=0",
+  "773": "https://rutracker.org/forum/tracker.php?f=773&o=1&s=2&start=0",
+  "774": "https://rutracker.org/forum/tracker.php?f=774&o=1&s=2&start=0",
+  "968": "https://rutracker.org/forum/tracker.php?f=968&o=1&s=2&start=0",
+  "129": "https://rutracker.org/forum/tracker.php?f=129&o=1&s=2&start=0"
 };
 
 const statusEl = document.getElementById("status");
@@ -68,7 +72,7 @@ collectButton.addEventListener("click", async () => {
     try {
       response = await chrome.tabs.sendMessage(tab.id, { type: "TICO_COLLECT_CURRENT_CATEGORY" });
     } catch (_error) {
-      throw new Error("Расширение ещё не подключено к этой вкладке. Обнови страницу RuTracker (F5) и повтори.");
+      throw new Error("Расширение ещё не подключено к вкладке. Обнови страницу RuTracker (F5) и повтори.");
     }
 
     if (!response?.ok) throw new Error(response?.error || "Не удалось прочитать категорию.");
@@ -77,7 +81,7 @@ collectButton.addEventListener("click", async () => {
     const current = await chrome.storage.local.get({ games: [], collected: {} });
     const previousGames = Array.isArray(current.games) ? current.games : [];
 
-    // Replace this category's previous snapshot, preserving the other categories.
+    // Replace this category's previous snapshot, preserving all other categories.
     const keepOtherCategories = previousGames.filter(game => game.platform !== result.platform);
     const merged = new Map();
     for (const game of [...keepOtherCategories, ...result.games]) {
