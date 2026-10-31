@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Экспорт базы Tico</title>
+  <link rel="stylesheet" href="popup.css">
+  <script src="export.js" defer></script>
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <div class="logo">T</div>
+      <div>
+        <h1>Экспорт базы Tico</h1>
+        <p>RuTracker Retro Games</p>
+      </div>
+    </header>
+    <section class="intro">
+      <strong id="count">Подготовка JSON…</strong>
+      <span>Файл будет сохранён в стандартную папку загрузок Chrome.</span>
+    </section>
+    <section class="section">
+      <button id="download" class="download" disabled>Скачать rutracker_retro_games_raw.json</button>
+      <p id="status" class="status" role="status"></p>
+    </section>
+  </main>
+</body>
+</html>
