@@ -1,10 +1,15 @@
 (() => {
   "use strict";
 
+  // Category IDs confirmed by the user from RuTracker.
   const CATEGORIES = {
-    "2424": "NES / Dendy",
-    "2425": "SEGA Mega Drive",
-    "2394": "Sony PlayStation 1"
+    "908": "Игры для PS",
+    "357": "Игры для PS2",
+    "1116": "PS1 и PSP",
+    "773": "Wii U / Wii / GameCube",
+    "774": "3DS / DS",
+    "968": "Dreamcast",
+    "129": "Остальные консоли"
   };
 
   function detectChallenge() {
@@ -47,22 +52,22 @@
     const platform = CATEGORIES[categoryId];
 
     if (!platform) {
-      throw new Error("Неизвестная категория. Поддерживаются NES / Dendy, SEGA Mega Drive и Sony PlayStation 1.");
+      throw new Error("Неизвестная категория. Открой одну из семи категорий консольных игр в меню расширения.");
     }
 
-    // Let the page finish rendering its result table before parsing.
+    // Wait briefly for RuTracker to render the topic table.
     let rows = document.querySelectorAll("tr.t-row");
-    for (let attempt = 0; rows.length === 0 && attempt < 10; attempt += 1) {
+    for (let attempt = 0; rows.length === 0 && attempt < 20; attempt += 1) {
       await new Promise(resolve => setTimeout(resolve, 500));
       rows = document.querySelectorAll("tr.t-row");
     }
 
     if (detectChallenge()) {
-      throw new Error("RuTracker показывает проверку безопасности. Сначала заверши её в окне браузера.");
+      throw new Error("RuTracker показывает проверку безопасности. Сначала заверши её в обычном окне браузера.");
     }
 
     if (rows.length === 0) {
-      throw new Error("На странице не найдены строки раздач (tr.t-row). Возможно, разметка RuTracker изменилась или страница ещё загружается.");
+      throw new Error("На странице не найдены строки раздач (tr.t-row). Возможно, разметка RuTracker изменилась или таблица ещё загружается.");
     }
 
     const games = [];
@@ -88,7 +93,7 @@
     }
 
     if (games.length === 0) {
-      throw new Error("Строки страницы есть, но не удалось извлечь названия и ID раздач.");
+      throw new Error("Строки страницы найдены, но не удалось извлечь названия и ID раздач.");
     }
 
     return {
