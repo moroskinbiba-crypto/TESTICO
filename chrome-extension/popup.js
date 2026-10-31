@@ -10,101 +10,120 @@ const CATEGORY_URLS = {
 
 const statusEl = document.getElementById("status");
 const summaryEl = document.getElementById("summary");
-const collectButton = document.getElementById("collect");
+const captureButton = document.getElementById("capture");
 const exportButton = document.getElementById("export");
 const clearButton = document.getElementById("clear");
+const toggleButton = document.getElementById("toggleAuto");
 
-function showStatus(message, type = "") {
+function status(message, type = "") {
   statusEl.textContent = message;
   statusEl.className = "status" + (type ? " " + type : "");
 }
 
-async function getActiveTab() {
-  const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  return tabs[0] || null;
+async function getPages() {
+  const all = await chrome.storage.local.get(null);
+  return Object.entries(all)
+    .filter(([key, value]) => key.startsWith("fp:") && value && typeof value === "object")
+    .map(([, value]) => value);
 }
 
-async function refreshSummary() {
-  const data = await chrome.storage.local.get({ games: [], collected: {} });
-  const games = Array.isArray(data.games) ? data.games : [];
-  const collected = data.collected || {};
-  const entries = Object.entries(collected);
+function countLinks(pages) {
+  const unique = new Map();
+  for (const page of pages) {
+    for (const link of page.download_links || []) {
+      if (link.url) unique.set(link.type + "|" + link.url, link);
+    }
+  }
+  return Array.from(unique.values());
+}
 
-  if (entries.length === 0) {
-    summaryEl.textContent = "Пока ничего не собрано";
-  } else {
-    const lines = entries.map(([platform, info]) => {
-      const date = info.updatedAt ? new Date(info.updatedAt).toLocaleString("ru-RU") : "";
-      return `• ${platform}: ${info.count} раздач${date ? " · " + date : ""}`;
-    });
-    lines.push(`Всего уникальных раздач: ${games.length}`);
-    summaryEl.textContent = lines.join("\n");
+async function refresh() {
+  const [pages, settings, lastData] = await Promise.all([
+    getPages(),
+    chrome.storage.local.get({ tico_auto_capture: true }),
+    chrome.storage.local.get({ tico_last_capture: null })
+  ]);
+  const topics = new Set(pages.filter(page => page.kind === "topic").map(page => String(page.topic_id)));
+  const listingPages = pages.filter(page => page.kind === "listing");
+  const listedTopics = new Set();
+  for (const page of listingPages) {
+    for (const item of page.listing_topics || []) listedTopics.add(String(item.topic_id));
+  }
+  const links = countLinks(pages);
+
+  const lines = [
+    "Всего отпечатков: " + pages.length,
+    "Страниц категорий: " + listingPages.length,
+    "Уникальных тем в списках: " + listedTopics.size,
+    "Открытых страниц раздач: " + topics.size,
+    "Уникальных ссылок скачивания: " + links.length,
+    "Magnet: " + links.filter(link => link.type === "magnet").length,
+    "Torrent / dl.php: " + links.filter(link => link.type !== "magnet").length
+  ];
+
+  const last = lastData.tico_last_capture;
+  if (last?.ok) {
+    lines.push("Последняя: " + (last.title || last.key));
+    if (last.kind === "topic") lines.push("Ссылок на ней: " + (last.download_link_count || 0));
+  } else if (last?.error) {
+    lines.push("Последняя ошибка: " + last.error);
   }
 
-  exportButton.disabled = games.length === 0;
-  clearButton.disabled = games.length === 0;
+  summaryEl.textContent = pages.length ? lines.join("\n") : "Пока отпечатков нет.";
+  exportButton.disabled = pages.length === 0;
+  clearButton.disabled = pages.length === 0;
+
+  const enabled = Boolean(settings.tico_auto_capture);
+  toggleButton.textContent = enabled ? "Автосбор: ВКЛ" : "Автосбор: ВЫКЛ";
+  toggleButton.classList.toggle("secondary", !enabled);
+  toggleButton.classList.toggle("primary", enabled);
 }
 
 document.querySelectorAll("[data-category]").forEach(button => {
   button.addEventListener("click", async () => {
     try {
-      const tab = await getActiveTab();
-      if (!tab?.id) throw new Error("Не удалось определить активную вкладку.");
-      await chrome.tabs.update(tab.id, { url: CATEGORY_URLS[button.dataset.category] });
+      const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      if (!tabs[0]?.id) throw new Error("Не удалось определить активную вкладку.");
+      await chrome.tabs.update(tabs[0].id, { url: CATEGORY_URLS[button.dataset.category] });
       window.close();
     } catch (error) {
-      showStatus(error.message || String(error), "error");
+      status(error.message || String(error), "error");
     }
   });
 });
 
-collectButton.addEventListener("click", async () => {
-  collectButton.disabled = true;
-  showStatus("Читаю открытую страницу RuTracker…");
+toggleButton.addEventListener("click", async () => {
+  const current = await chrome.storage.local.get({ tico_auto_capture: true });
+  await chrome.storage.local.set({ tico_auto_capture: !current.tico_auto_capture });
+  await refresh();
+});
 
+captureButton.addEventListener("click", async () => {
+  captureButton.disabled = true;
+  status("Снимаю отпечаток текущей страницы…");
   try {
-    const tab = await getActiveTab();
+    const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    const tab = tabs[0];
     if (!tab?.id || !tab.url?.startsWith("https://rutracker.org/forum/")) {
-      throw new Error("Сначала открой RuTracker в этой вкладке.");
+      throw new Error("Открой страницу RuTracker в этой вкладке.");
     }
-
     let response;
     try {
-      response = await chrome.tabs.sendMessage(tab.id, { type: "TICO_COLLECT_CURRENT_CATEGORY" });
-    } catch (_error) {
-      throw new Error("Расширение ещё не подключено к вкладке. Обнови страницу RuTracker (F5) и повтори.");
+      response = await chrome.tabs.sendMessage(tab.id, { type: "TICO_CAPTURE_CURRENT_PAGE" });
+    } catch (_) {
+      throw new Error("Расширение ещё не подключено к вкладке. Обнови страницу RuTracker клавишей F5.");
     }
-
-    if (!response?.ok) throw new Error(response?.error || "Не удалось прочитать категорию.");
-
-    const result = response.result;
-    const current = await chrome.storage.local.get({ games: [], collected: {} });
-    const previousGames = Array.isArray(current.games) ? current.games : [];
-
-    // Replace this category's previous snapshot, preserving all other categories.
-    const keepOtherCategories = previousGames.filter(game => game.platform !== result.platform);
-    const merged = new Map();
-    for (const game of [...keepOtherCategories, ...result.games]) {
-      merged.set(String(game.rutracker_id), game);
-    }
-
-    const games = Array.from(merged.values());
-    const collected = {
-      ...(current.collected || {}),
-      [result.platform]: {
-        count: result.games.length,
-        updatedAt: new Date().toISOString(),
-        categoryId: result.category_id
-      }
-    };
-
-    await chrome.storage.local.set({ games, collected });
-    showStatus(`Добавлено ${result.count} раздач: ${result.platform}.`, "success");
-    await refreshSummary();
+    if (!response?.ok) throw new Error(response?.error || "Не удалось снять отпечаток.");
+    status(
+      "Сохранено: " + (response.result.title || response.result.key) +
+      ". Ссылок скачивания: " + response.result.download_link_count + ".",
+      "success"
+    );
+    await refresh();
   } catch (error) {
-    showStatus(error.message || String(error), "error");
+    status(error.message || String(error), "error");
   } finally {
-    collectButton.disabled = false;
+    captureButton.disabled = false;
   }
 });
 
@@ -113,11 +132,13 @@ exportButton.addEventListener("click", () => {
 });
 
 clearButton.addEventListener("click", async () => {
-  const confirmed = confirm("Удалить все собранные раздачи?");
-  if (!confirmed) return;
-  await chrome.storage.local.set({ games: [], collected: {} });
-  showStatus("Локальная база очищена.", "success");
-  await refreshSummary();
+  if (!confirm("Удалить все отпечатки страниц и найденные ссылки?")) return;
+  const all = await chrome.storage.local.get(null);
+  const keys = Object.keys(all).filter(key => key.startsWith("fp:"));
+  if (keys.length) await chrome.storage.local.remove(keys);
+  await chrome.storage.local.remove("tico_last_capture");
+  status("Локальная база очищена.", "success");
+  await refresh();
 });
 
-refreshSummary().catch(error => showStatus(error.message || String(error), "error"));
+refresh().catch(error => status(error.message || String(error), "error"));

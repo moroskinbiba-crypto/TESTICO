@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tico Retro Collector</title>
+  <title>Tico — отпечатки RuTracker</title>
   <link rel="stylesheet" href="popup.css">
   <script src="popup.js" defer></script>
 </head>
@@ -12,66 +12,46 @@
     <header class="header">
       <div class="logo">T</div>
       <div>
-        <h1>Tico Retro Collector</h1>
-        <p>Сборщик консольных игр RuTracker</p>
+        <h1>Tico Page Fingerprinter</h1>
+        <p>Сбор страниц и ссылок раздач</p>
       </div>
     </header>
 
     <section class="intro">
-      <strong>Работает в твоём обычном Chrome</strong>
-      <span>Авторизуйся на RuTracker как обычно. Расширение считывает только открытую таблицу раздач и не получает доступ к паролю или cookies.</span>
+      <strong>Автосбор в обычном Chrome</strong>
+      <span>Открывай категории и страницы отдельных раздач. Расширение сохраняет отпечаток, magnet-ссылки и адреса .torrent / dl.php. Скачивание не запускается.</span>
     </section>
 
     <section class="section">
-      <div class="section-title">1. Открой нужную категорию</div>
+      <div class="section-title">Автоматический сбор</div>
+      <button id="toggleAuto" class="primary">Автосбор: ВКЛ</button>
+      <button id="capture" class="secondary" style="margin-top:7px">Снять отпечаток текущей страницы</button>
+      <p id="status" class="status" role="status">Открой страницу RuTracker — она будет сохранена автоматически.</p>
+    </section>
+
+    <section class="section">
+      <div class="section-title">Быстрый переход</div>
       <div class="category-list">
-        <button class="category-button" data-category="908">
-          <span><b>Игры для PS</b><small>Категория RuTracker 908</small></span>
-          <span class="arrow">Открыть ↗</span>
-        </button>
-        <button class="category-button" data-category="357">
-          <span><b>Игры для PS2</b><small>Категория RuTracker 357</small></span>
-          <span class="arrow">Открыть ↗</span>
-        </button>
-        <button class="category-button" data-category="1116">
-          <span><b>PS1 и PSP</b><small>Категория RuTracker 1116</small></span>
-          <span class="arrow">Открыть ↗</span>
-        </button>
-        <button class="category-button" data-category="773">
-          <span><b>Wii U / Wii / GameCube</b><small>Категория RuTracker 773</small></span>
-          <span class="arrow">Открыть ↗</span>
-        </button>
-        <button class="category-button" data-category="774">
-          <span><b>3DS / DS</b><small>Категория RuTracker 774</small></span>
-          <span class="arrow">Открыть ↗</span>
-        </button>
-        <button class="category-button" data-category="968">
-          <span><b>Dreamcast</b><small>Категория RuTracker 968</small></span>
-          <span class="arrow">Открыть ↗</span>
-        </button>
-        <button class="category-button" data-category="129">
-          <span><b>Остальные консоли</b><small>Категория RuTracker 129</small></span>
-          <span class="arrow">Открыть ↗</span>
-        </button>
+        <button class="category-button" data-category="908"><span><b>Игры для PS</b><small>Категория 908</small></span><span class="arrow">Открыть ↗</span></button>
+        <button class="category-button" data-category="357"><span><b>Игры для PS2</b><small>Категория 357</small></span><span class="arrow">Открыть ↗</span></button>
+        <button class="category-button" data-category="1116"><span><b>PS1 и PSP</b><small>Категория 1116</small></span><span class="arrow">Открыть ↗</span></button>
+        <button class="category-button" data-category="773"><span><b>Wii U / Wii / GameCube</b><small>Категория 773</small></span><span class="arrow">Открыть ↗</span></button>
+        <button class="category-button" data-category="774"><span><b>3DS / DS</b><small>Категория 774</small></span><span class="arrow">Открыть ↗</span></button>
+        <button class="category-button" data-category="968"><span><b>Dreamcast</b><small>Категория 968</small></span><span class="arrow">Открыть ↗</span></button>
+        <button class="category-button" data-category="129"><span><b>Остальные консоли</b><small>Категория 129</small></span><span class="arrow">Открыть ↗</span></button>
       </div>
     </section>
 
-    <section class="section">
-      <div class="section-title">2. Добавь открытую категорию</div>
-      <button id="collect" class="primary">Добавить текущую страницу</button>
-      <p id="status" class="status" role="status">Открой категорию выше, дождись загрузки раздач и нажми кнопку.</p>
-    </section>
-
     <section class="section collected">
-      <div class="section-title">Собрано</div>
-      <div id="summary" class="summary">Пока ничего не собрано</div>
+      <div class="section-title">Собрано локально</div>
+      <div id="summary" class="summary">Пока отпечатков нет.</div>
       <div class="actions">
-        <button id="export" class="download" disabled>Скачать JSON</button>
+        <button id="export" class="download" disabled>Экспорт JSON</button>
         <button id="clear" class="secondary" disabled>Очистить</button>
       </div>
     </section>
 
-    <footer>JSON: rutracker_retro_games_raw.json</footer>
+    <footer>Данные остаются на этом компьютере · v1.2.0</footer>
   </main>
 </body>
 </html>
