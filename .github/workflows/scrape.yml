@@ -1,9 +1,9 @@
 name: Run RuTracker Scraper
 
 on:
-  workflow_dispatch: # Позволяет запускать вручную из вкладки Actions
+  workflow_dispatch:
   schedule:
-    - cron: '0 0 * * 0' # Автозапуск раз в неделю
+    - cron: '0 0 * * 0' # Every Sunday at 00:00 UTC
 
 permissions:
   contents: write
@@ -27,13 +27,16 @@ jobs:
 
       - name: Run script
         env:
-          BB_DATA: ${{ secrets.BB_DATA }}
-        run: |
-          python parser.py
+          BB_SESSION: ${{ secrets.BB_SESSION }}
+          BB_GUID: ${{ secrets.BB_GUID }}
+          BB_SSL: ${{ secrets.BB_SSL }}
+          BB_T: ${{ secrets.BB_T }}
+          CF_CLEARANCE: ${{ secrets.CF_CLEARANCE }}
+        run: python parser.py
 
       - name: Commit and push changes if JSON updated
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add rutracker_retro_games_raw.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update retro games JSON database" && git push)
+          git diff --cached --quiet || (git commit -m "Update retro games JSON database" && git push)
