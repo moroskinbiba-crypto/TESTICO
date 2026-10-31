@@ -1,0 +1,60 @@
+name: Package Chrome extension
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "chrome-extension/**"
+      - ".github/workflows/build-extension.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate extension manifest and scripts
+        shell: bash
+        run: |
+          python -m json.tool chrome-extension/manifest.json > /dev/null
+          node --check chrome-extension/content.js
+          node --check chrome-extension/popup.js
+          node --check chrome-extension/export.js
+
+      - name: Create extension ZIP
+        shell: bash
+        run: |
+          mkdir -p dist
+          cd chrome-extension
+          zip -r ../dist/Tico-RuTracker-Chrome-Extension.zip .
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tico-RuTracker-Chrome-Extension
+          path: dist/Tico-RuTracker-Chrome-Extension.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish extension ZIP to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: windows-latest
+          name: Tico RuTracker Scraper — Windows
+          body: |
+            Tico RuTracker collector for Google Chrome.
+
+            Install the unpacked extension through chrome://extensions.
+            Open RuTracker in your normal Chrome session, collect each category, then export the JSON.
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          files: dist/Tico-RuTracker-Chrome-Extension.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
