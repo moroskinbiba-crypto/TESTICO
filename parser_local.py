@@ -2,6 +2,8 @@ import json
 import re
 import sys
 import time
+import traceback
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -17,6 +19,18 @@ else:
 
 PROFILE_DIR = BASE_DIR / ".rutracker-profile"
 OUTPUT_FILE = BASE_DIR / "rutracker_retro_games_raw.json"
+LOG_FILE = BASE_DIR / "parser.log"
+
+
+def log(message):
+    stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"[{stamp}] {message}"
+    print(line, flush=True)
+    try:
+        with LOG_FILE.open("a", encoding="utf-8") as log_file:
+            log_file.write(line + "\\n")
+    except OSError:
+        pass
 
 SEARCH_URL = "https://rutracker.org/forum/tracker.php"
 HOME_URL = "https://rutracker.org/forum/index.php"
@@ -113,15 +127,22 @@ def parse_category(page, category_name, category_id):
             "size_bytes": size_bytes,
         })
 
-    print(f"Найдено раздач: {len(games)}")
+    log(f"Найдено раздач в категории '{category_name}': {len(games)}")
     time.sleep(2)
     return games
 
 
 def main():
-    print("Локальный парсер RuTracker для Tico")
-    print(f"Профиль браузера: {PROFILE_DIR}")
-    print("Cookie вручную копировать не нужно — Chromium сохранит сессию локально.")
+    log("Локальный парсер RuTracker для Tico")
+    log(f"Каталог программы: {BASE_DIR}")
+    log(f"Путь к EXE/скрипту: {sys.executable}")
+    log(f"Профиль браузера: {PROFILE_DIR}")
+    log(f"Путь для JSON: {OUTPUT_FILE}")
+    log("Cookie вручную копировать не нужно — Chromium сохранит сессию локально.")
+    if PROFILE_DIR.exists():
+        log("Найден ранее созданный профиль браузера.")
+    else:
+        log("Будет создан новый профиль браузера.")
 
     with sync_playwright() as playwright:
         try:
@@ -182,4 +203,31 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+        print("\\nСбор завершён. Нажми Enter для закрытия окна.", flush=True)
+        try:
+            input()
+        except EOFError:
+            pass
+    except KeyboardInterrupt:
+        log("Работа прервана пользователем.")
+        raise SystemExit(130)
+    except Exception:
+        error_details = traceback.format_exc()
+        try:
+            with LOG_FILE.open("a", encoding="utf-8") as log_file:
+                log_file.write("\\n===== ОШИБКА =====\\n")
+                log_file.write(error_details)
+                log_file.write("\\n")
+        except OSError:
+            pass
+        print("\\nОШИБКА: JSON не создан.", flush=True)
+        print(error_details, flush=True)
+        print(f"Подробный журнал: {LOG_FILE}", flush=True)
+        print("Скопируй текст ошибки или пришли файл parser.log.", flush=True)
+        try:
+            input("Нажми Enter, чтобы закрыть программу...")
+        except EOFError:
+            pass
+        raise SystemExit(1)
